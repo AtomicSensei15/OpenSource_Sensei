@@ -12,6 +12,7 @@ import requests
 from collections import defaultdict
 import ast
 import logging
+from itertools import islice
 
 from .base_agent import BaseAgent, AgentCapability, TaskResult
 from .utils.file_analyzer import FileAnalyzer
@@ -153,7 +154,6 @@ class RepositoryAnalysisAgent(BaseAgent):
                 
                 # Analyze the cloned repository
                 analysis_result = await self._analyze_local_repository(temp_dir)
-                
                 # Add GitHub-specific metadata
                 analysis_result["metadata"].update({
                     "github_stats": {
@@ -167,9 +167,15 @@ class RepositoryAnalysisAgent(BaseAgent):
                         "updated_at": repo.updated_at.isoformat(),
                         "default_branch": repo.default_branch
                     },
-                    "contributors": [contributor.login for contributor in repo.get_contributors()[:10]],
+                    "contributors": [
+                        name for name in (
+                            getattr(c, "login", getattr(c, "name", None))
+                            for c in islice(repo.get_contributors(), 10)
+                        ) if name
+                    ],
                     "topics": repo.get_topics(),
                     "license": repo.license.name if repo.license else None
+                })
                 })
                 
                 return analysis_result
