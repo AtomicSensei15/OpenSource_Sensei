@@ -31,17 +31,19 @@ class AgentAnalysisResponse(BaseModel):
     result: Dict[str, Any]
 
 
-# Assuming agents are in an 'agents' directory relative to 'backend'
-# This path adjustment might be needed depending on how you run the app
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-from agents.repository_analyzer import RepositoryAnalysisAgent
-from agents.code_review_agent import CodeReviewAgent
-from agents.qa_agent import QAAgent
-from agents.research_agent import ResearchAgent
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Import agents (Python path is configured in main.py)
+try:
+    from agents.repository_analyzer import RepositoryAnalysisAgent
+    from agents.code_review_agent import CodeReviewAgent
+    from agents.qa_agent import QAAgent
+    from agents.research_agent import ResearchAgent
+except ImportError as e:
+    logger.error(f"Failed to import agents: {e}")
+    logger.info("Make sure the project root is in Python path")
+    raise
 
 # In-memory storage for analysis sessions
 analysis_store: Dict[str, Dict[str, Any]] = {}

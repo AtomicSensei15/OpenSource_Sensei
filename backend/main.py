@@ -1,5 +1,5 @@
 """
-FastAPI main application with MongoDB integration.
+FastAPI main application - simplified version.
 """
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,27 +7,33 @@ from contextlib import asynccontextmanager
 import logging
 import time
 import sys
+import os
 from pathlib import Path
 
-"""Adjust Python path so absolute 'app.*' imports work whether launched as 'python backend/main.py'
-or 'uvicorn backend.main:app'."""
-current_dir = Path(__file__).resolve().parent
-parent_dir = current_dir  # backend/
-if str(parent_dir) not in sys.path:
-    sys.path.insert(0, str(parent_dir))
-
-from app.core.config import get_settings  # type: ignore  # noqa: E402
-from app.core.database import connect_to_mongo, close_mongo_connection, check_database_connection  # type: ignore  # noqa: E402
-from app.core.logging import setup_logging  # type: ignore  # noqa: E402
-from app.api.router import api_router  # type: ignore  # noqa: E402
-
-
-# Setup logging
-setup_logging()
+# Setup basic logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get settings
-settings = get_settings()
+# Basic settings class
+class Settings:
+    app_name: str = "OpenSource Sensei API"
+    app_version: str = "1.0.0"
+    api_prefix: str = "/api/v1"
+    host: str = "0.0.0.0"
+    port: int = 8000
+    debug: bool = True
+    cors_origins: list = ["*"]
+    persistence_mode: str = "memory"
+    disable_database: bool = True
+
+settings = Settings()
+
+# Add project root to Python path to enable imports
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+    
+logger.info(f"Added project root to Python path: {project_root}")
 
 
 @asynccontextmanager
@@ -35,39 +41,14 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     logger.info("Starting OpenSource Sensei API...")
-    # Log persistence configuration early for diagnostics
-    logger.info(
-        "Persistence configuration: mode=%s disable_database=%s (set PERSISTENCE_MODE=memory to force in-memory)",
-        settings.persistence_mode,
-        settings.disable_database,
-    )
-    # Decide whether to attempt DB connection
-    # Normalize again defensively (in case settings loaded before validator in some edge path)
-    pmode = (settings.persistence_mode or "database").strip().lower()
-    skip_db = pmode == "memory" or settings.disable_database
-    logger.debug("Evaluated skip_db=%s (persistence_mode=%s disable_database=%s)", skip_db, pmode, settings.disable_database)
-    if skip_db:
-        logger.info("Database connection skipped (in-memory mode enabled)")
-        app.state.db_connected = False
-    else:
-        try:
-            await connect_to_mongo()
-            logger.info("Database connection established")
-            app.state.db_connected = True
-        except Exception as e:
-            logger.warning(f"Failed to connect to database: {e}")
-            logger.warning("Continuing without database (fallback to in-memory store)")
-            app.state.db_connected = False
+    logger.info("Running in memory mode (no database)")
+    app.state.db_connected = False
     
     yield
     
     # Shutdown
     logger.info("Shutting down OpenSource Sensei API...")
-    if getattr(app.state, 'db_connected', False):
-        await close_mongo_connection()
-        logger.info("Database connection closed")
-    else:
-        logger.info("No database connection to close")
+    logger.info("No database connection to close")
 
 
 # Create FastAPI app
@@ -96,8 +77,14 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
-# Include API router
-app.include_router(api_router, prefix=settings.api_prefix)
+# Include analysis endpoints if available
+try:
+    from app.api.endpoints.analysis import router as analysis_router
+    app.include_router(analysis_router, prefix=f"{settings.api_prefix}/analysis", tags=["analysis"])
+    logger.info("Analysis endpoints loaded successfully")
+except ImportError as e:
+    logger.warning(f"Could not load analysis endpoints: {e}")
+    logger.info("Running with basic endpoints only")
 
 
 @app.get("/")
@@ -115,14 +102,10 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     try:
-        db_healthy = False
-        if getattr(app.state, 'db_connected', False):
-            db_healthy = await check_database_connection()
-        
         return {
-            "status": "healthy",  # Service is healthy even without DB for development
-            "database": ("connected" if db_healthy else "disconnected") if not settings.disable_database and settings.persistence_mode != "memory" else "disabled",
-            "database_required": not (settings.persistence_mode == "memory" or settings.disable_database),
+            "status": "healthy",
+            "database": "disabled",
+            "database_required": False,
             "persistence_mode": settings.persistence_mode,
             "version": settings.app_version,
             "environment": "development"
@@ -131,7 +114,7 @@ async def health_check():
         logger.error(f"Health check failed: {e}")
         return {
             "status": "degraded",
-            "database": "disconnected", 
+            "database": "disabled", 
             "error": str(e),
             "version": settings.app_version
         }
