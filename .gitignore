@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.env
+.env
+node_modules 
+
+# Virtual environments
+.env*/
+.venv/
+venv/
+ENV/
+
+# Editors / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Coverage / test
+htmlcov/
+.coverage*
+.pytest_cache/
+
+# Byte-compiled / packaging
+build/
+dist/
+*.egg-info/
+
+# Local environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+*.rar
