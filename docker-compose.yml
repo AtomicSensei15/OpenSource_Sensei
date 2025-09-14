@@ -24,6 +24,31 @@ services:
       retries: 3
       start_period: 40s
 
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Docker/Dockerfile
+    # Expose the static site via Nginx
+    ports:
+      - "3000:80"  # Browser: http://localhost:3000
+    # environment:
+    #   # If you need to point to an external API host, uncomment and adjust:
+    #   # VITE_API_BASE_URL=http://localhost:8000/api/v1
+    #   # Build-time override for proxy target (not exposed to client). Usually unnecessary in container network.
+    #   # VITE_API_PROXY_TARGET=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # For local iterative frontend development you might prefer mounting source and using `npm run dev` instead
+    # Replace the build with a development override compose file if needed.
+
   mongodb:
     image: mongo:6.0
     ports:
@@ -41,3 +66,10 @@ services:
 
 volumes:
   mongodb_data:
+
+# Optional production notes:
+# In production you may want to:
+# - Serve backend behind a reverse proxy (Traefik / Caddy / Nginx ingress)
+# - Enable HTTPS termination at the proxy level
+# - Provide explicit resource limits
+# - Externalize MongoDB (managed service)

@@ -187,6 +187,40 @@ Limitations in memory mode:
 
 To force Mongo usage, ensure the database is reachable before starting the server.
 
+## Docker Compose (API + Frontend + MongoDB)
+
+A frontend service (Nginx serving the Vite build) has been added to `docker-compose.yml`.
+
+Services:
+- api: FastAPI backend on port 8000 (exposed)
+- frontend: Static SPA on port 3000 (proxying /api -> backend inside container network via Nginx)
+- mongodb: MongoDB 6.0 instance with persistent volume
+
+### Quick Start
+```bash
+# Build and start all services
+docker compose up --build
+# Visit frontend
+http://localhost:3000
+# API (direct)
+http://localhost:8000/api/v1/health  # (assuming health mounted with prefix)
+```
+
+### Environment Overrides
+The frontend defaults to relative `/api/v1` calls. To point it elsewhere at build time:
+```bash
+# Uncomment environment section in docker-compose frontend service or build with:
+docker compose build --build-arg VITE_API_BASE_URL=http://your-host/api/v1 frontend
+```
+For local iterative development you can still run the Vite dev server separately (`npm run dev`) and let it proxy to the backend.
+
+### Production Considerations
+- Add TLS termination (Traefik / Caddy / Nginx reverse proxy)
+- Externalize MongoDB (managed cluster) and remove exposed port in compose
+- Set real `SECRET_KEY` and any API keys via `.env` + `env_file` directive
+- Add resource limits (deploy section) if using Swarm/Kubernetes
+- Enable access logs / structured logging aggregation
+
 ## Contributing
 
 Please read CONTRIBUTING.md for details on our code of conduct and submission process.

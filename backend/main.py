@@ -35,8 +35,17 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     logger.info("Starting OpenSource Sensei API...")
+    # Log persistence configuration early for diagnostics
+    logger.info(
+        "Persistence configuration: mode=%s disable_database=%s (set PERSISTENCE_MODE=memory to force in-memory)",
+        settings.persistence_mode,
+        settings.disable_database,
+    )
     # Decide whether to attempt DB connection
-    skip_db = settings.persistence_mode.lower() == "memory" or settings.disable_database
+    # Normalize again defensively (in case settings loaded before validator in some edge path)
+    pmode = (settings.persistence_mode or "database").strip().lower()
+    skip_db = pmode == "memory" or settings.disable_database
+    logger.debug("Evaluated skip_db=%s (persistence_mode=%s disable_database=%s)", skip_db, pmode, settings.disable_database)
     if skip_db:
         logger.info("Database connection skipped (in-memory mode enabled)")
         app.state.db_connected = False
@@ -97,7 +106,8 @@ async def root():
     return {
         "message": "OpenSource Sensei API",
         "version": settings.app_version,
-        "status": "running"
+        "status": "running",
+        "persistence_mode": settings.persistence_mode,
     }
 
 
@@ -107,7 +117,6 @@ async def health_check():
     try:
         db_healthy = False
         if getattr(app.state, 'db_connected', False):
-            from app.core.database import check_database_connection
             db_healthy = await check_database_connection()
         
         return {

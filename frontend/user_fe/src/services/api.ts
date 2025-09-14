@@ -7,11 +7,9 @@ export interface JsonObject { [key: string]: JsonValue }
 export type JsonArray = JsonValue[];
 
 // API base configuration
-// Allow override through Vite env variable: define VITE_API_BASE_URL in .env (e.g., http://localhost:8000/api/v1)
-// Vite injects `import.meta.env` typed as `ImportMetaEnv`; we safely index into it.
-const API_BASE_URL: string = (import.meta as ImportMeta).env && (import.meta as ImportMeta).env.VITE_API_BASE_URL
-  ? (import.meta as ImportMeta).env.VITE_API_BASE_URL
-  : 'http://localhost:8000/api/v1';
+// Prefer relative path (/api/v1) so that in Docker or behind a reverse proxy the browser origin is used.
+// Override via VITE_API_BASE_URL when an absolute URL is required (e.g., different host/port in dev).
+export const API_BASE_URL: string = (import.meta as ImportMeta).env.VITE_API_BASE_URL || '/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

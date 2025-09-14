@@ -67,3 +67,42 @@ export default tseslint.config([
   },
 ])
 ```
+
+## Environment Variables
+
+The frontend communicates with the FastAPI backend through a relative path by default: `/api/v1`.
+This works seamlessly in:
+
+- Local dev with the Vite proxy (configured in `vite.config.ts`) pointing to `http://localhost:8000`.
+- Docker / container environments where the frontend and backend are served from the same origin or behind a reverse proxy.
+
+Override the base URL only when the API is on a different host/port (e.g., remote dev server):
+
+Steps:
+
+1. Copy `.env.example` to `.env` in this directory.
+2. Set `VITE_API_BASE_URL` to an absolute URL if needed.
+
+```bash
+# Optional – only override when not using same-origin + proxy
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+If `VITE_API_BASE_URL` is unset, Axios uses the relative path so requests go to the current page origin.
+The effective value is exported from `src/services/api.ts` as `API_BASE_URL`.
+
+### Dev Proxy
+
+The Vite dev server proxy is configured so any request starting with `/api` is forwarded to the backend target (default `http://localhost:8000`).
+Adjust `VITE_API_PROXY_TARGET` (a Node env var, not exposed to the client) when starting Vite if the backend runs elsewhere:
+
+```bash
+# Example (Linux/macOS shell)
+VITE_API_PROXY_TARGET=http://127.0.0.1:9000 npm run dev
+```
+
+On Windows cmd you can run:
+
+```cmd
+set VITE_API_PROXY_TARGET=http://127.0.0.1:9000 && npm run dev
+```
