@@ -176,7 +176,6 @@ class RepositoryAnalysisAgent(BaseAgent):
                     "topics": repo.get_topics(),
                     "license": repo.license.name if repo.license else None
                 })
-                })
                 
                 return analysis_result
                 
@@ -229,16 +228,23 @@ class RepositoryAnalysisAgent(BaseAgent):
         # Extract project structure
         structure_data = await self._extract_project_structure(repo_path)
         analysis["structure"] = structure_data
-        
-        # Analyze programming languages
+
+        # Analyze programming languages (includes code size)
         analysis["languages"] = self._analyze_languages(repo_path)
-        
+
+        # Count total lines of code across recognized source files
+        loc_stats = self._count_lines_of_code(repo_path)
+        analysis["languages"].update(loc_stats)  # adds total_lines and per-language lines if available
+
         # Analyze dependencies
         analysis["dependencies"] = await self._analyze_dependencies(repo_path)
-        
+
         # Extract metadata
         analysis["metadata"] = self._extract_metadata(repo_path)
-        
+
+        # Detect project type (Python vs Node.js vs Mixed etc.)
+        analysis["metadata"]["project_type"] = self._detect_project_type(repo_path)
+
         return analysis
     
     async def _extract_project_structure(self, project_path: str) -> Dict[str, Any]:
@@ -342,6 +348,62 @@ class RepositoryAnalysisAgent(BaseAgent):
             "languages": dict(sorted(language_breakdown.items(), key=lambda x: x[1]["percentage"], reverse=True)),
             "total_code_size": total_size
         }
+
+    def _count_lines_of_code(self, repo_path: str) -> Dict[str, Any]:
+        """Count lines of code per language (simple heuristic)"""
+        line_counts: Dict[str, int] = defaultdict(int)
+        total_lines = 0
+        extensions_map = {ext: lang for ext, lang in self.programming_languages.items()}
+
+        for root, dirs, files in os.walk(repo_path):
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'venv', '.git']]
+            for file in files:
+                ext = Path(file).suffix.lower()
+                if ext in extensions_map:
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            # Basic line counting ignoring very long binary-looking lines
+                            lines = [ln for ln in f.readlines() if ln.strip() and len(ln) < 10000]
+                            count = len(lines)
+                            line_counts[extensions_map[ext]] += count
+                            total_lines += count
+                    except Exception:
+                        continue
+
+        return {
+            "total_lines": total_lines,
+            "lines_per_language": dict(sorted(line_counts.items(), key=lambda x: x[1], reverse=True))
+        }
+
+    def _detect_project_type(self, repo_path: str) -> str:
+        """Detect high-level project type based on sentinel files"""
+        has_package_json = os.path.exists(os.path.join(repo_path, 'package.json'))
+        has_requirements = os.path.exists(os.path.join(repo_path, 'requirements.txt')) or \
+                            any(fname.endswith('.py') for fname in os.listdir(repo_path) if fname.endswith('.py'))
+        has_pyproject = os.path.exists(os.path.join(repo_path, 'pyproject.toml'))
+
+        # Priority logic: If both ecosystems present -> Mixed
+        if (has_package_json and (has_requirements or has_pyproject)):
+            return 'Mixed'
+        if has_package_json:
+            return 'Node.js'
+        if has_requirements or has_pyproject:
+            return 'Python'
+        # Fallback to primary language if available
+        try:
+            # Attempt to reuse earlier computed language stats if called after _analyze_languages
+            # but since we don't have that passed, recompute cheap heuristic scanning top-level
+            for item in os.listdir(repo_path):
+                if item.endswith('.go'):
+                    return 'Go'
+                if item.endswith('.rs'):
+                    return 'Rust'
+                if item.endswith('.java'):
+                    return 'Java'
+        except Exception:
+            pass
+        return 'Unknown'
     
     async def _analyze_dependencies(self, repo_path: str) -> Dict[str, Any]:
         """Analyze project dependencies using DependencyAnalyzer"""

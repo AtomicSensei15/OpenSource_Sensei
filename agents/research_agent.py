@@ -160,7 +160,8 @@ class ResearchAgent(BaseAgent):
     
     async def process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Process research tasks"""
-        task_type = task.get("type")
+        # Accept both 'type' and legacy 'task_type' keys
+        task_type = task.get("type") or task.get("task_type")
         
         if task_type == "search_documentation":
             return await self._search_documentation(

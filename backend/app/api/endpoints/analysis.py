@@ -195,7 +195,7 @@ async def run_agent_analysis(analysis_id: str, agent_id: str):
         elif agent_id == "research_agent":
             # Use the research agent to provide insights about the repository
             research_task = {
-                "task_type": "research_best_practices",
+                "type": "research_best_practices",
                 "language": "python",  # Default, could be detected from repo
                 "topic": "code analysis and best practices"
             }

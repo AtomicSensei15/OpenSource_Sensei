@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle2, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-// Visualization components below avoid external chart overhead for language distribution.
 
 interface MetricCardProps {
   title: string;
@@ -11,6 +10,7 @@ interface MetricCardProps {
   icon: React.ReactNode;
   color: string;
 }
+
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, value, change, icon, color }) => {
   const getTrendIcon = () => {
@@ -50,7 +50,7 @@ interface IssueListProps {
   issues: Array<{
     title: string;
     description: string;
-    severity: 'high' | 'medium' | 'low';
+    severity: 'high' | 'medium' | 'low' | string;
     file?: string;
     line_number?: number;
   }>;
@@ -218,7 +218,74 @@ const LanguageStats: React.FC<LanguageStatsProps> = ({ data, title = 'Language D
   );
 };
 
-// Usage example:
-// <LanguageStats data={analysisResult?.languages?.languages} />
-// Backend shape (per language): { bytes: number, lines: number, percentage: number, file_count: number }
-export { MetricCard, IssueList, ChartContainer, COLORS, LanguageStats };
+interface FileIssue {
+  title: string;
+  description: string;
+  severity: 'high' | 'medium' | 'low' | string;
+  file_path?: string;
+  line_number?: number;
+}
+
+interface FileSummaryCardProps {
+  file: {
+    file_path: string;
+    quality_score: number;
+    issues: FileIssue[];
+    metrics: {
+      lines_of_code: number;
+      complexity: number;
+      functions: number;
+      classes: number;
+      docstring_coverage: number;
+    };
+  };
+}
+
+const FileSummaryCard: React.FC<FileSummaryCardProps> = ({ file }) => {
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span className="truncate">{file.file_path.split('/').pop()}</span>
+          <Badge variant={file.quality_score > 80 ? 'success' : file.quality_score > 50 ? 'warning' : 'destructive'}>
+            Score: {file.quality_score}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-center">
+          <div>
+            <p className="text-sm text-slate-500">Lines of Code</p>
+            <p className="text-lg font-bold">{file.metrics.lines_of_code}</p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Complexity</p>
+            <p className="text-lg font-bold">{file.metrics.complexity}</p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Functions</p>
+            <p className="text-lg font-bold">{file.metrics.functions}</p>
+          </div>
+          <div>
+            <p className="text-sm text-slate-500">Classes</p>
+            <p className="text-lg font-bold">{file.metrics.classes}</p>
+          </div>
+        </div>
+        {file.issues.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2">Issues:</h4>
+            <IssueList issues={file.issues.map(issue => ({
+              title: issue.title,
+              description: issue.description,
+              severity: issue.severity,
+              file: issue.file_path,
+              line_number: issue.line_number,
+            }))} maxItems={5} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export { MetricCard, IssueList, ChartContainer, COLORS, LanguageStats, FileSummaryCard };
