@@ -80,7 +80,7 @@ async def add_process_time_header(request: Request, call_next):
 # Include analysis endpoints if available
 try:
     from app.api.endpoints.analysis import router as analysis_router
-    app.include_router(analysis_router, prefix=f"{settings.api_prefix}/analysis", tags=["analysis"])
+    app.include_router(analysis_router, prefix=f"{settings.api_prefix}", tags=["analysis"])
     logger.info("Analysis endpoints loaded successfully")
 except ImportError as e:
     logger.warning(f"Could not load analysis endpoints: {e}")
